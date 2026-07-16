@@ -6,7 +6,7 @@ Updated: 2026-07-16 evening. Plan: `docs/plans/2026-07-15-claim-check-implementa
 - Tasks 0-5 done and committed (latest: `feat(consumer): kafka listener with claim-check resolution and metrics`).
 - Consumer service complete: resolver unit tests + Testcontainers integration test all GREEN
   (`cd consumer-service && ./gradlew test` — 4 tests, ~10s with cached docker images).
-- NO git remote configured — commits are local only. Ask user for remote before pushing.
+- Remote: `origin` = git@github.com:buildtolast/KafkaMessagePersistenceLatencyChecker.git (push after each task).
 
 ## Local LLM environment (working setup)
 - llama.cpp at `http://localhost:8080` (health: `/health`), model
