@@ -187,10 +187,10 @@ public final class ClaimCheckResolver {
   public java.util.Optional<ResolvedMessage> resolve(MessageEnvelope env) {}
 }
 ```
-- [ ] **Step 4.1:** Copy the two model files from producer (change package), commit-stage them.
-- [ ] **Step 4.2:** Generate resolver test (`llm-gen.sh`): inline envelope → ResolvedMessage with path INLINE and reader uncalled; mongoId envelope → reader fetch called, path CLAIM_CHECK, payload from reader; missing document → `Optional.empty()`. Recording fake reader, no Mockito. Confirm RED.
-- [ ] **Step 4.3:** `llm-gen.sh` `PayloadReader.java` + `ResolvedMessage.java`; `llm-loop.py` for `ClaimCheckResolver.java` with verify `cd consumer-service && ./gradlew test` → GREEN.
-- [ ] **Step 4.4:** Review; `tools/token-report.py`; Commit: `feat(consumer): claim-check resolver with missing-document handling`
+- [x] **Step 4.1:** Copy the two model files from producer (change package), commit-stage them.
+- [x] **Step 4.2:** Generate resolver test (`llm-gen.sh`): inline envelope → ResolvedMessage with path INLINE and reader uncalled; mongoId envelope → reader fetch called, path CLAIM_CHECK, payload from reader; missing document → `Optional.empty()`. Recording fake reader, no Mockito. Confirm RED.
+- [x] **Step 4.3:** `llm-gen.sh` `PayloadReader.java` + `ResolvedMessage.java`; `llm-loop.py` for `ClaimCheckResolver.java` with verify `cd consumer-service && ./gradlew test` → GREEN.
+- [x] **Step 4.4:** Review; `tools/token-report.py`; Commit: `feat(consumer): claim-check resolver with missing-document handling`
 
 ---
 
