@@ -19,8 +19,11 @@ LOG = os.environ.get("LLM_USAGE_LOG",
 
 
 def chat(messages):
-    body = json.dumps({"model": MODEL, "temperature": 0.2, "max_tokens": 16384,
-                       "messages": messages}).encode()
+    payload = {"model": MODEL, "temperature": 0.2, "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", "16384")),
+               "messages": messages}
+    if os.environ.get("LLM_NO_THINK"):
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
+    body = json.dumps(payload).encode()
     req = urllib.request.Request(
         BASE_URL + "/v1/chat/completions", data=body,
         headers={"Content-Type": "application/json",

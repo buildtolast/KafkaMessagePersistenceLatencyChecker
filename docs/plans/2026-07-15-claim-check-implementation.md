@@ -214,10 +214,10 @@ public final class ClaimCheckResolver {
   // deserialize -> resolve -> metrics (e2e from producedAtEpochNanos) -> log mode/size/latency; missing doc: error log, no throw
 }
 ```
-- [ ] **Step 5.1:** Generate integration test first: Testcontainers Kafka+Mongo; seed one 3-byte inline envelope and one claim-check envelope whose payload was pre-inserted into `large_payloads`; assert both are consumed and `consumer.messages` counters for both path tags reach 1 (query `MeterRegistry`). Confirm RED.
-- [ ] **Step 5.2:** Generate main files single-shot in order (`ConsumerMetrics` → `MongoPayloadReader` → `EnvelopeListener` → `ConsumerApplication`); loop only a single offender if the suite fails. → GREEN.
-- [ ] **Step 5.3:** Review (checked IOException on `mapper.readValue`, no listener throw on missing doc); `tools/token-report.py`.
-- [ ] **Step 5.4:** Commit: `feat(consumer): kafka listener with claim-check resolution and metrics`
+- [x] **Step 5.1:** Generate integration test first: Testcontainers Kafka+Mongo; seed one 3-byte inline envelope and one claim-check envelope whose payload was pre-inserted into `large_payloads`; assert both are consumed and `consumer.messages` counters for both path tags reach 1 (query `MeterRegistry`). Confirm RED.
+- [x] **Step 5.2:** Generate main files single-shot in order (`ConsumerMetrics` → `MongoPayloadReader` → `EnvelopeListener` → `ConsumerApplication`); loop only a single offender if the suite fails. → GREEN.
+- [x] **Step 5.3:** Review (checked IOException on `mapper.readValue`, no listener throw on missing doc); `tools/token-report.py`.
+- [x] **Step 5.4:** Commit: `feat(consumer): kafka listener with claim-check resolution and metrics`
 
 ---
 

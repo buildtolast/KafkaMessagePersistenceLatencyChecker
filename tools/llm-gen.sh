@@ -27,14 +27,17 @@ SYSTEM = (
     "no placeholders or TODOs. Reply with exactly one fenced code block containing "
     "the full file and nothing outside it."
 )
-body = json.dumps({
+payload = {
     "model": os.environ["MODEL"],
     "temperature": 0.2,
-    "max_tokens": 16384,
+    "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", "16384")),
     "messages": [
         {"role": "user", "content": SYSTEM + "\n\n" + os.environ["SPEC"]},
     ],
-}).encode()
+}
+if os.environ.get("LLM_NO_THINK"):
+    payload["chat_template_kwargs"] = {"enable_thinking": False}
+body = json.dumps(payload).encode()
 
 req = urllib.request.Request(
     os.environ["BASE_URL"] + "/v1/chat/completions", data=body,
