@@ -125,10 +125,25 @@ Every Kafka record on topic `messages` is the same JSON envelope; exactly one of
   - Pushes snapshots to the browser via **SSE** (`/api/stream`); also `GET /api/stats`
     for scripting.
   - **UI:** single static `index.html` served by the same app — vanilla JS + Chart.js
-    (vendored into `src/main/resources/static/`, no CDN at runtime). Live line charts
-    (latency percentiles over time per path), bar chart (segment breakdown:
-    where the claim-check path pays its cost), counters row (throughput per path),
-    and instance health tiles.
+    (vendored into `src/main/resources/static/`, no CDN at runtime). Layout contract
+    (comparison-centric, top to bottom):
+    1. **Header bar** — title, load settings (payload size, pairs/s, window),
+       live indicator, pause button.
+    2. **Hero comparison strip** — INLINE and CLAIM_CHECK face each other:
+       e2e p95 as the headline number, msg/s + MB/s subline, a small latency
+       sparkline per path, and centered between them an **overhead delta badge**
+       (+ms and +% p95, claim-check relative to inline).
+    3. **Latency percentiles chart** — rolling 5-minute Chart.js line chart,
+       per path: p50 solid, p99 dashed (tail behavior is the interesting part).
+    4. **"Where the time goes"** — horizontal segment bars per path, bar width
+       proportional to total average latency; segments labeled inline
+       (inline: kafka-send, processing; claim-check: mongo-insert, kafka-send,
+       mongo-fetch, processing). Plus a Mongo storage counter (total docs, GB)
+       given keep-forever retention.
+    5. **Cluster status strip** — one-line footer: kafka brokers up (n/3),
+       mongo replica-set state + primary, producer rate, each consumer's
+       partition/rate/lag with a warning icon when lagging. Clicking the strip
+       expands per-instance detail tiles.
 - No Prometheus server, Grafana, or agents — everything lives inside the apps.
 
 ## 8. Data Model (MongoDB)
