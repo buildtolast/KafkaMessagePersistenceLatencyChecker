@@ -5,6 +5,7 @@ plugins {
 }
 group = 'com.codrite.claimcheck'
 java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+ext['testcontainers.version'] = '1.21.4'
 repositories { mavenCentral() }
 dependencies {
   implementation 'org.springframework.boot:spring-boot-starter'
