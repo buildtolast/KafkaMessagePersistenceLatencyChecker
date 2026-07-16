@@ -1,0 +1,7 @@
+spring:
+  application.name: dashboard-service
+server.port: 8085
+management.endpoints.web.exposure.include: health
+app:
+  dashboard:
+    targets: ${DASHBOARD_TARGETS:http://localhost:8080,http://localhost:8081}

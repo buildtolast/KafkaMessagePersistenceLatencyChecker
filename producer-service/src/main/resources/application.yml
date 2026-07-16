@@ -1,0 +1,25 @@
+spring:
+  application.name: producer-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        max.request.size: 3145728
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/claimcheck?w=majority}
+server.port: 8080
+management:
+  endpoints.web.exposure.include: health,prometheus,metrics
+  metrics.distribution.percentiles-histogram:
+    producer.kafka.send: true
+    producer.mongo.insert: true
+app:
+  claim-check.threshold-bytes: 2097152
+  load:
+    enabled: ${LOAD_ENABLED:true}
+    tick-millis: 200
+    payload-bytes: 2097152
