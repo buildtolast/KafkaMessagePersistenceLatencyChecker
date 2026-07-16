@@ -247,9 +247,9 @@ public final class MetricsAggregator {
   public synchronized ComparisonModel aggregate(java.util.Map<String, java.util.List<MetricSample>> snapshots) {}
 }
 ```
-- [ ] **Step 6.1:** Generate `PrometheusScraperTest` (parse a literal 15-line exposition sample: counters, timer `_sum`/`_count`, histogram quantile lines, a `# HELP` comment, a `NaN`) — confirm RED; `llm-loop.py` the scraper → GREEN. Commit: `feat(dashboard): prometheus text parser`.
-- [ ] **Step 6.2:** Generate `MetricsAggregatorTest` (two consumer instances' samples merge: counter rates from deltas across two aggregate calls, quantiles averaged across instances weighted by count, per-path stats keyed by `path` tag, instance down = absent snapshot) — confirm RED; generate the two records single-shot; `llm-loop.py` the aggregator → GREEN.
-- [ ] **Step 6.3:** Review percentile-merge math by hand; `tools/token-report.py`; Commit: `feat(dashboard): multi-instance metrics aggregation`
+- [x] **Step 6.1:** Generate `PrometheusScraperTest` (parse a literal 15-line exposition sample: counters, timer `_sum`/`_count`, histogram quantile lines, a `# HELP` comment, a `NaN`) — confirm RED; `llm-loop.py` the scraper → GREEN. Commit: `feat(dashboard): prometheus text parser`.
+- [x] **Step 6.2:** Generate `MetricsAggregatorTest` (two consumer instances' samples merge: counter rates from deltas across two aggregate calls, quantiles averaged across instances weighted by count, per-path stats keyed by `path` tag, instance down = absent snapshot) — confirm RED; generate the two records single-shot; `llm-loop.py` the aggregator → GREEN.
+- [x] **Step 6.3:** Review percentile-merge math by hand; `tools/token-report.py`; Commit: `feat(dashboard): multi-instance metrics aggregation`
 
 ---
 
