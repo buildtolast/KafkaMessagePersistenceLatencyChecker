@@ -19,21 +19,21 @@ public class ConsumerMetrics {
     public Timer e2eLatency(DeliveryPath p) {
         return Timer.builder("consumer.e2e.latency")
                 .tag("path", p.name())
-                .publishPercentileHistogram()
+                .publishPercentiles(0.5, 0.95, 0.99)
                 .register(registry);
     }
 
     public Timer processing(DeliveryPath p) {
         return Timer.builder("consumer.processing")
                 .tag("path", p.name())
-                .publishPercentileHistogram()
+                .publishPercentiles(0.5, 0.95, 0.99)
                 .register(registry);
     }
 
     public Timer mongoFetch() {
         return Timer.builder("consumer.mongo.fetch")
                 .tag("path", DeliveryPath.CLAIM_CHECK.name())
-                .publishPercentileHistogram()
+                .publishPercentiles(0.5, 0.95, 0.99)
                 .register(registry);
     }
 

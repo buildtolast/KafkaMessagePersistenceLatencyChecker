@@ -38,7 +38,12 @@ Output EXACTLY ONE top-level class, max 70 lines:
      Do NOT throw.
   5. ResolvedMessage msg = resolved.get();
      java.time.Duration processing = java.time.Duration.ofNanos(System.nanoTime() - startNanos);
-     java.time.Duration e2e = java.time.Duration.ofNanos(System.nanoTime() - env.producedAtEpochNanos());
+     java.time.Instant now = java.time.Instant.now();
+     long nowEpochNanos = now.getEpochSecond() * 1_000_000_000L + now.getNano();
+     java.time.Duration e2e = java.time.Duration.ofNanos(Math.max(0L, nowEpochNanos - env.producedAtEpochNanos()));
+     (producedAtEpochNanos is EPOCH-based — never compare it against System.nanoTime(),
+      whose origin is arbitrary. The Math.max clamp is REQUIRED: with clock skew the
+      difference can go negative and Micrometer silently drops negative recordings.)
      metrics.recordProcessing(msg.path(), processing);
      metrics.recordE2e(msg.path(), e2e);
      metrics.recordMessage(msg.path(), msg.sizeBytes());

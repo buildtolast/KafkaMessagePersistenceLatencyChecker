@@ -26,7 +26,7 @@ consumers, making the latency comparison apples-to-apples. (A routing threshold 
 
 ```mermaid
 flowchart LR
-    subgraph producer["producer-service :8080"]
+    subgraph producer["producer-service :8090"]
         PG[PairGenerator<br/>1 pair / tick] --> RT[ClaimCheckRouter]
     end
 
@@ -38,7 +38,7 @@ flowchart LR
         LP[(claimcheck.large_payloads<br/>w:majority, keep forever)]
     end
 
-    subgraph consumers["consumer-service x3 :8081 (group claim-check-demo)"]
+    subgraph consumers["consumer-service x3 :8091 (group claim-check-demo)"]
         L[EnvelopeListener] --> RS[ClaimCheckResolver]
         RS --> MR[MongoPayloadReader]
     end
@@ -64,8 +64,8 @@ in [docker-compose.yml](docker-compose.yml):
 
 | Service | Instances | Port | Role |
 |---|---|---|---|
-| `producer-service` | 1 | 8080 | Generates forced-path pairs, routes via threshold, inserts claim-check payloads into Mongo, publishes envelopes to Kafka |
-| `consumer-service` | 3 | 8081 (internal) | Kafka listener group; resolves envelopes (fetching claim-check payloads from Mongo), records end-to-end latency |
+| `producer-service` | 1 | 8090 | Generates forced-path pairs, routes via threshold, inserts claim-check payloads into Mongo, publishes envelopes to Kafka |
+| `consumer-service` | 3 | 8091 (internal) | Kafka listener group; resolves envelopes (fetching claim-check payloads from Mongo), records end-to-end latency |
 | `dashboard-service` | 1 | **8085 (host-mapped)** | Scrapes every instance's Prometheus endpoint, aggregates, streams the comparison UI over SSE |
 | `kafka1..3` | 3 | 9092 | Apache Kafka 3.9 KRaft quorum (no ZooKeeper); `message.max.bytes=3 MiB` |
 | `mongo1..3` | 3 | 27017 | Mongo 7 replica set `rs0` |
@@ -209,4 +209,4 @@ be running.
 | Producer service (router, Mongo store, publisher, pair generator, metrics) | Done, tests green |
 | Consumer service (listener, resolver, Mongo reader, metrics) | Done, tests green |
 | Dashboard service (scraper, aggregator, SSE, UI) | Done, tests green — browser validation in Task 8 |
-| End-to-end compose validation | Pending (Task 8) |
+| End-to-end compose validation | Done — full stack healthy, dashboard verified live in browser |

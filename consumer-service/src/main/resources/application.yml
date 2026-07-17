@@ -12,10 +12,9 @@ spring:
   data:
     mongodb:
       uri: ${MONGO_URI:mongodb://localhost:27017/claimcheck?w=majority}
-server.port: 8081
+server.port: 8091
 management:
   endpoints.web.exposure.include: health,prometheus,metrics
   metrics.distribution.percentiles-histogram:
-    consumer.e2e.latency: true
     consumer.processing: true
     consumer.mongo.fetch: true

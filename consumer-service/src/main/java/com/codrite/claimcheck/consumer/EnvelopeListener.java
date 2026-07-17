@@ -8,6 +8,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 
 @Component
@@ -18,9 +19,7 @@ public final class EnvelopeListener {
     private final ConsumerMetrics metrics;
     private final ObjectMapper mapper;
 
-    public EnvelopeListener(ClaimCheckResolver resolver,
-                            ConsumerMetrics metrics,
-                            ObjectMapper mapper) {
+    public EnvelopeListener(ClaimCheckResolver resolver, ConsumerMetrics metrics, ObjectMapper mapper) {
         this.resolver = resolver;
         this.metrics = metrics;
         this.mapper = mapper;
@@ -40,14 +39,15 @@ public final class EnvelopeListener {
         Optional<ResolvedMessage> resolved = resolver.resolve(env);
 
         if (resolved.isEmpty()) {
-            log.error("missing claim-check document mongoId={} messageId={}",
-                    env.mongoId(), env.messageId());
+            log.error("missing claim-check document mongoId={} messageId={}", env.mongoId(), env.messageId());
             return;
         }
 
         ResolvedMessage msg = resolved.get();
         Duration processing = Duration.ofNanos(System.nanoTime() - startNanos);
-        Duration e2e = Duration.ofNanos(System.nanoTime() - env.producedAtEpochNanos());
+        Instant now = Instant.now();
+        long nowEpochNanos = now.getEpochSecond() * 1_000_000_000L + now.getNano();
+        Duration e2e = Duration.ofNanos(Math.max(0L, nowEpochNanos - env.producedAtEpochNanos()));
 
         metrics.recordProcessing(msg.path(), processing);
         metrics.recordE2e(msg.path(), e2e);

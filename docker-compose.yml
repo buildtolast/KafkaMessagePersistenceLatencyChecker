@@ -95,7 +95,7 @@ services:
       KAFKA_BOOTSTRAP: kafka1:9092,kafka2:9092,kafka3:9092
       MONGO_URI: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/claimcheck?replicaSet=rs0&w=majority
     healthcheck: &app-health
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/actuator/health | grep -q UP"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -107,7 +107,7 @@ services:
       mongo-init: { condition: service_completed_successfully }
     environment: *app-env
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8091/actuator/health | grep -q UP"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -121,4 +121,4 @@ services:
     depends_on:
       producer: { condition: service_healthy }
     environment:
-      DASHBOARD_TARGETS: http://producer:8080,http://consumer1:8081,http://consumer2:8081,http://consumer3:8081
+      DASHBOARD_TARGETS: http://producer:8090,http://consumer1:8091,http://consumer2:8091,http://consumer3:8091

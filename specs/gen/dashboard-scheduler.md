@@ -13,7 +13,7 @@ ALREADY EXIST in this package (reference, do NOT declare any of them):
   and `public synchronized ComparisonModel aggregate(Map<String, List<MetricSample>> snapshots)`
 - record ComparisonModel(Map<String,PathStats> byPath, List<InstanceHealth> instances, long mongoDocs, double mongoBytes)
 
-Output EXACTLY ONE top-level class, max 70 lines:
+Output EXACTLY ONE top-level class, max 80 lines:
 
 @Component
 public class ScrapeScheduler
@@ -32,7 +32,8 @@ Fields:
 - `private final AtomicReference<ComparisonModel> latest = new AtomicReference<>(new ComparisonModel(Map.of(), List.of(), 0L, 0.0));`
 
 Constructor: `public ScrapeScheduler(@Value("${app.dashboard.targets}") String targetsCsv)` —
-split on ',', trim each entry, skip blanks, store as List.
+split on ',', trim each entry, skip blanks, store as List; if the resulting list
+is empty, `throw new IllegalStateException("app.dashboard.targets is empty");`.
 
 `@Scheduled(fixedRate = 2000)`
 `public void scrape()`:
@@ -40,11 +41,13 @@ split on ',', trim each entry, skip blanks, store as List.
 - for each target: GET target + "/actuator/prometheus" with a 1500 ms request
   timeout (`HttpRequest.newBuilder(...).timeout(...)`, BodyHandlers.ofString()).
   On status 200, put `snapshots.put(target, PrometheusScraper.parse(body))`.
-  Any exception (catch Exception) or non-200: leave that target out of the map
-  (that marks the instance down) — do not rethrow, do not log stack traces
-  (a single `System.err` line is NOT wanted either; just swallow).
+  On failure or non-200: leave that target out of the map (that marks the
+  instance down) — never rethrow. Two catch blocks per target, in this order:
+  1. `catch (InterruptedException e)` → `Thread.currentThread().interrupt(); return;`
+     (MUST restore the interrupt flag and abort the whole scrape pass).
+  2. `catch (Exception e)` → `log.debug("scrape failed for {}: {}", target, e.toString());`
+- Add a logger field: `private static final Logger log = LoggerFactory.getLogger(ScrapeScheduler.class);`
+  with imports org.slf4j.Logger and org.slf4j.LoggerFactory.
 - `latest.set(aggregator.aggregate(snapshots));`
-- note: HttpClient.send declares InterruptedException/IOException — the per-target
-  try/catch around Exception covers both.
 
 `public ComparisonModel latest()` — return `latest.get();`
