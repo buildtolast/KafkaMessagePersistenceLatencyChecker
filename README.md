@@ -208,5 +208,5 @@ be running.
 | Infrastructure (compose topology, clusters, init jobs) | Done |
 | Producer service (router, Mongo store, publisher, pair generator, metrics) | Done, tests green |
 | Consumer service (listener, resolver, Mongo reader, metrics) | Done, tests green |
-| Dashboard service (scraper, aggregator, SSE, UI) | In progress — design final (above), implementation is Tasks 6–7 of the plan |
+| Dashboard service (scraper, aggregator, SSE, UI) | Done, tests green — browser validation in Task 8 |
 | End-to-end compose validation | Pending (Task 8) |
