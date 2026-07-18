@@ -1,75 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claim-Check Latency Dashboard</title>
-    <style>
-        body { background: #111418; color: #e6e6e6; font-family: sans-serif; margin: 0; padding: 20px; }
-        header { display: flex; align-items: center; gap: 15px; margin-bottom: 20px; }
-        #live-dot { width: 10px; height: 10px; border-radius: 50%; background: #444; }
-        #live-dot.on { background: #2ecc71; box-shadow: 0 0 8px #2ecc71; }
-        button { background: #2a2f36; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
-        #hero { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px; align-items: center; }
-        .path-card { background: #1b2027; border: 1px solid #2a2f36; padding: 20px; border-radius: 8px; text-align: center; }
-        .big { font-size: 2.2rem; font-weight: bold; }
-        #delta-badge { text-align: center; }
-        #delta-badge .big { font-size: 2.5rem; color: #ff6b6b; }
-        section { margin-bottom: 30px; }
-        .seg-row { display: flex; align-items: center; gap: 15px; margin-bottom: 10px; }
-        .seg-label { width: 100px; font-size: 0.8rem; font-weight: bold; }
-        .seg-bar { flex-grow: 1; display: flex; height: 24px; background: #2a2f36; border-radius: 4px; overflow: hidden; }
-        .seg { height: 100%; }
-        #mongo-storage { font-size: 0.85rem; color: #888; text-align: right; margin-top: 10px; }
-        footer { border-top: 1px solid #2a2f36; padding-top: 10px; font-size: 0.8rem; color: #666; }
-        .inline-color { color: #4dabf7; }
-        .cc-color { color: #f59f00; }
-    </style>
+<meta charset="UTF-8">
+<title>Claim check vs inline</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; background:#f7f8fa; color:#212529; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  .card { background:#fff; border:1px solid #e3e6ea; border-radius:10px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  header { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; }
+  header h1 { margin:0; font-size:1.3rem; }
+  .sub { font-size:0.8rem; color:#495057; margin-top:4px; }
+  #live-pill { display:inline-flex; align-items:center; gap:6px; background:#e6f7ec; border-radius:999px; padding:4px 12px; margin-right:10px; font-size:0.8rem; }
+  #live-dot { width:10px; height:10px; border-radius:50%; background:#adb5bd; display:inline-block; }
+  #live-dot.on { background:#2f9e44; }
+  #pause-btn { border:1px solid #e3e6ea; background:#fff; border-radius:6px; padding:6px 12px; cursor:pointer; }
+  main { padding:0 20px 20px; display:flex; flex-direction:column; gap:16px; }
+  #hero { display:grid; grid-template-columns:1fr 200px 1fr; gap:16px; }
+  .path-card { padding:16px; }
+  .inline-color { color:#3b7dd8; }
+  .cc-color { color:#7048e8; }
+  h2 { font-size:0.95rem; margin:0 0 8px; }
+  .big { font-size:2.6rem; font-weight:bold; }
+  .metric-label { font-size:0.8rem; color:#495057; margin-bottom:8px; }
+  #delta-badge { padding:16px; text-align:center; display:flex; flex-direction:column; justify-content:center; }
+  .delta-label { font-size:0.8rem; color:#495057; }
+  #delta-ms { color:#c92a2a; background:#fdecec; border-radius:8px; padding:4px 8px; }
+  #delta-pct { font-size:0.85rem; color:#495057; margin-top:4px; }
+  #cols { display:grid; grid-template-columns:2fr 1fr; gap:16px; }
+  #chart-panel, #time-panel { padding:16px; }
+  .hint { font-size:0.75rem; color:#868e96; margin:4px 0; }
+  .seg-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .seg-label { width:80px; font-size:0.8rem; }
+  .seg-bar { flex:1; height:28px; display:flex; border-radius:4px; overflow:hidden; }
+  .seg { color:#fff; font-size:0.72rem; display:flex; align-items:center; justify-content:center; white-space:nowrap; overflow:hidden; }
+  #mongo-storage-card { margin-top:12px; padding:10px; font-size:0.85rem; }
+  footer { display:flex; align-items:center; gap:10px; padding:12px 20px; }
+  .strip-label { font-size:0.8rem; color:#495057; }
+  .chip { display:inline-flex; align-items:center; gap:6px; background:#f1f3f5; border-radius:999px; padding:4px 10px; font-size:0.8rem; }
+  .chip.warn { background:#fff3bf; }
+</style>
 </head>
 <body>
-    <header>
-        <h1>Claim-Check Latency Dashboard</h1>
-        <span id="live-dot"></span>
-        <button id="pause-btn">Pause</button>
-    </header>
-
-    <section id="hero">
-        <div class="path-card">
-            <h2 class="inline-color">INLINE</h2>
-            <div class="big" id="inline-p95">–</div>
-            <div id="inline-rate">0 req/s</div>
-        </div>
-        <div id="delta-badge">
-            <div class="big" id="delta-ms">–</div>
-            <div id="delta-pct">–</div>
-            <div style="font-size: 0.8rem; color: #888;">claim-check overhead</div>
-        </div>
-        <div class="path-card">
-            <h2 class="cc-color">CLAIM_CHECK</h2>
-            <div class="big" id="cc-p95">–</div>
-            <div id="cc-rate">0 req/s</div>
-        </div>
+<header class="card">
+  <div>
+    <h1>Claim check vs inline</h1>
+    <div class="sub">2 MB pairs · live comparison · window 5 min</div>
+  </div>
+  <div>
+    <span id="live-pill"><span id="live-dot"></span><span class="live-label">live</span></span>
+    <button id="pause-btn">Pause</button>
+  </div>
+</header>
+<main>
+  <section id="hero">
+    <div class="path-card card">
+      <h2 class="inline-color">INLINE · Kafka only</h2>
+      <div class="big" id="inline-p95">–</div>
+      <div class="metric-label">e2e p95 · <span id="inline-rate">–</span></div>
+      <canvas id="inline-spark" height="28"></canvas>
+    </div>
+    <div id="delta-badge" class="card">
+      <div class="delta-label">overhead</div>
+      <div class="big" id="delta-ms">–</div>
+      <div id="delta-pct">–</div>
+    </div>
+    <div class="path-card card">
+      <h2 class="cc-color">CLAIM CHECK · Kafka + Mongo</h2>
+      <div class="big" id="cc-p95">–</div>
+      <div class="metric-label">e2e p95 · <span id="cc-rate">–</span></div>
+      <canvas id="cc-spark" height="28"></canvas>
+    </div>
+  </section>
+  <div id="cols">
+    <section id="chart-panel" class="card">
+      <h3>Latency percentiles</h3>
+      <div class="hint">p50 solid · p99 dashed</div>
+      <canvas id="lat-chart" height="120"></canvas>
     </section>
-
-    <section>
-        <canvas id="lat-chart" height="90"></canvas>
-    </section>
-
-    <section id="segments">
-        <div class="seg-row">
-            <span class="seg-label">INLINE</span>
-            <div class="seg-bar" id="seg-inline"></div>
-        </div>
-        <div class="seg-row">
-            <span class="seg-label">CLAIM_CHECK</span>
-            <div class="seg-bar" id="seg-cc"></div>
-        </div>
-        <div id="mongo-storage">Mongo: – docs, – GB</div>
-    </section>
-
-    <footer id="cluster-strip">Cluster Status: Connected</footer>
-
-    <script src="vendor/chart.umd.js"></script>
-    <script src="app.js"></script>
+    <aside id="time-panel" class="card">
+      <h3>Where the time goes</h3>
+      <div class="seg-row"><span class="seg-label inline-color">inline</span><div class="seg-bar" id="seg-inline"></div></div>
+      <div class="seg-row"><span class="seg-label cc-color">claim check</span><div class="seg-bar" id="seg-cc"></div></div>
+      <div class="hint">bar width ∝ avg ms per stage</div>
+      <div id="mongo-storage-card" class="card">stored in Mongo <strong id="mongo-storage">–</strong></div>
+    </aside>
+  </div>
+</main>
+<footer class="card">
+  <span class="strip-label">cluster</span>
+  <span id="cluster-strip"></span>
+</footer>
+<script src="vendor/chart.umd.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

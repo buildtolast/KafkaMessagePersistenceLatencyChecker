@@ -52,7 +52,8 @@ services:
     command: >
       "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka1:9092 --create
       --if-not-exists --topic messages --partitions 3 --replication-factor 3
-      --config min.insync.replicas=2 --config max.message.bytes=3145728"
+      --config min.insync.replicas=2 --config max.message.bytes=3145728
+      --config retention.bytes=2147483648 --config retention.ms=1800000"
 
   mongo1:
     image: mongo:7
@@ -84,7 +85,11 @@ services:
         rs.initiate({_id: \"rs0\", members: [
           {_id: 0, host: \"mongo1:27017\"},
           {_id: 1, host: \"mongo2:27017\"},
-          {_id: 2, host: \"mongo3:27017\"}]}) }'"
+          {_id: 2, host: \"mongo3:27017\"}]}) }';
+      until mongosh --host mongo1 --quiet --eval 'db.hello().isWritablePrimary || quit(1)' >/dev/null 2>&1; do sleep 2; done;
+      mongosh --host mongo1 --quiet --eval '
+      db.getSiblingDB(\"claimcheck\").large_payloads.createIndex(
+        {createdAt: 1}, {expireAfterSeconds: 1800})'"
 
   producer:
     build: ./producer-service
