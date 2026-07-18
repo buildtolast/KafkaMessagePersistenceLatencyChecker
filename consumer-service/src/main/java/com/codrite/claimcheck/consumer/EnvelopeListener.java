@@ -23,6 +23,7 @@ public final class EnvelopeListener {
     private final ConsumerMetrics metrics;
     private final ObjectMapper mapper;
     private final KafkaTemplate<String, String> kafkaTemplate;
+    private final TraceBuffer traceBuffer;
     private final int chainLength;
 
     public EnvelopeListener(
@@ -30,11 +31,13 @@ public final class EnvelopeListener {
             ConsumerMetrics metrics,
             ObjectMapper mapper,
             KafkaTemplate<String, String> kafkaTemplate,
+            TraceBuffer traceBuffer,
             @Value("${app.chain.length}") int chainLength) {
         this.stageProcessor = stageProcessor;
         this.metrics = metrics;
         this.mapper = mapper;
         this.kafkaTemplate = kafkaTemplate;
+        this.traceBuffer = traceBuffer;
         this.chainLength = chainLength;
     }
 
@@ -79,6 +82,7 @@ public final class EnvelopeListener {
         metrics.recordE2e(path, Duration.ofNanos(t.chainTotalLatencyNanos()));
         metrics.recordMessage(path, t.finalEnvelope().payloadSizeBytes());
         metrics.recordStageHop(stageNumber, path, Duration.ofNanos(System.nanoTime() - hopStartNanos));
+        traceBuffer.record(new TraceRecord(t.finalEnvelope().pairId(), path, t.finalEnvelope().hopTrace()));
 
         log.info("Terminal stage reached. MessageId: {}, Path: {}, Latency: {}ms",
                 t.finalEnvelope().messageId(), path, t.chainTotalLatencyNanos() / 1_000_000.0);
