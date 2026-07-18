@@ -1,6 +1,6 @@
 (() => {
   const zeroP = () => ({ msgPerSec: 0, mbPerSec: 0, e2eP50Ms: 0, e2eP95Ms: 0, e2eP99Ms: 0,
-    mongoInsertAvgMs: 0, kafkaSendAvgMs: 0, mongoFetchAvgMs: 0, processingAvgMs: 0 });
+    mongoInsertAvgMs: 0, kafkaSendAvgMs: 0, mongoFetchAvgMs: 0, hopLatencyAvgMsByStage: {} });
   const getP = (obj) => obj || zeroP();
 
   let paused = false;
@@ -78,6 +78,55 @@
 
   const shortName = (name) => name.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
 
+  const renderLane = (el, hopLatencyAvgMsByStage, color) => {
+    const stages = Object.keys(hopLatencyAvgMsByStage || {})
+      .map(Number)
+      .sort((a, b) => a - b);
+    el.innerHTML = '';
+    if (stages.length === 0) {
+      el.innerHTML = '<span class="wf-empty">no hops yet</span>';
+      return;
+    }
+    const max = Math.max(...stages.map((s) => hopLatencyAvgMsByStage[s]), 0.001);
+    stages.forEach((stage) => {
+      const ms = hopLatencyAvgMsByStage[stage];
+      const div = document.createElement('div');
+      div.className = 'lane-stage';
+      const intensity = Math.min(1, ms / max);
+      div.style.background = color;
+      div.style.opacity = String(0.35 + intensity * 0.65);
+      div.title = `stage ${stage}: ${ms.toFixed(1)} ms`;
+      div.textContent = ms >= 1 ? ms.toFixed(0) : '';
+      el.appendChild(div);
+    });
+  };
+
+  const renderWaterfall = (el, trace, color) => {
+    el.innerHTML = '';
+    if (!trace || !trace.hopTrace || trace.hopTrace.length === 0) {
+      el.innerHTML = '<span class="wf-empty">no sampled trace yet</span>';
+      return;
+    }
+    const hops = trace.hopTrace;
+    const origin = hops[0].consumedAtEpochNanos;
+    const durations = hops.map((h, idx) => {
+      const end = h.publishedAtEpochNanos != null ? h.publishedAtEpochNanos : h.consumedAtEpochNanos;
+      const next = hops[idx + 1];
+      const nextStart = next ? next.consumedAtEpochNanos : end;
+      return Math.max(nextStart - h.consumedAtEpochNanos, 1);
+    });
+    hops.forEach((h, idx) => {
+      const div = document.createElement('div');
+      div.className = 'wf-hop';
+      div.style.background = color;
+      div.style.opacity = String(0.4 + (idx / hops.length) * 0.6);
+      div.style.flexGrow = String(durations[idx]);
+      const ms = durations[idx] / 1_000_000;
+      div.title = `stage ${h.stage}: +${ms.toFixed(1)} ms`;
+      el.appendChild(div);
+    });
+  };
+
   es.addEventListener('stats', (e) => {
     if (paused) return;
     const d = JSON.parse(e.data);
@@ -115,15 +164,19 @@
     chart.update('none');
 
     renderSegs(document.getElementById('seg-inline'), [
-      { label: 'send', ms: i.kafkaSendAvgMs, color: '#4c86dd' },
-      { label: 'proc', ms: i.processingAvgMs, color: '#74c0fc' }
+      { label: 'send', ms: i.kafkaSendAvgMs, color: '#4c86dd' }
     ]);
     renderSegs(document.getElementById('seg-cc'), [
       { label: 'insert', ms: c.mongoInsertAvgMs, color: '#7048e8' },
       { label: 'send', ms: c.kafkaSendAvgMs, color: '#4c86dd' },
-      { label: 'fetch', ms: c.mongoFetchAvgMs, color: '#9775fa' },
-      { label: 'proc', ms: c.processingAvgMs, color: '#74c0fc' }
+      { label: 'fetch', ms: c.mongoFetchAvgMs, color: '#9775fa' }
     ]);
+
+    renderLane(document.getElementById('lanes-inline'), i.hopLatencyAvgMsByStage, '#3b7dd8');
+    renderLane(document.getElementById('lanes-cc'), c.hopLatencyAvgMsByStage, '#7048e8');
+
+    renderWaterfall(document.getElementById('wf-inline'), d.waterfall && d.waterfall.inline, '#3b7dd8');
+    renderWaterfall(document.getElementById('wf-cc'), d.waterfall && d.waterfall.claimCheck, '#7048e8');
 
     document.getElementById('mongo-storage').textContent =
       `${(d.mongoDocs || 0).toLocaleString()} docs · ${((d.mongoBytes || 0) / 1e9).toFixed(1)} GB`;
