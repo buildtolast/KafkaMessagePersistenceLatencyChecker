@@ -40,13 +40,13 @@ public final class StageProcessor {
         }
 
         if (envelope.mongoId() != null) {
-            Optional<String> fetched = reader.fetch(envelope.mongoId());
+            Optional<String> fetched = reader.fetch(envelope.mongoId(), config.stageNumber());
             if (fetched.isEmpty()) {
                 return new StageResult.Skipped("missing document: " + envelope.mongoId());
             }
 
             String transformed = transform(fetched.get());
-            String newMongoId = store.store(transformed, envelope.payloadSizeBytes());
+            String newMongoId = store.store(transformed, envelope.payloadSizeBytes(), config.stageNumber());
 
             Instant pubNow = clock.instant();
             long publishedAtEpochNanos = pubNow.getEpochSecond() * 1_000_000_000L + pubNow.getNano();

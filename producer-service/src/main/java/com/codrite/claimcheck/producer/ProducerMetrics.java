@@ -13,10 +13,10 @@ public final class ProducerMetrics {
         this.registry = registry;
     }
 
-    public Timer mongoInsert(DeliveryPath p) {
+    public Timer mongoInsert(int stage, DeliveryPath p) {
         return Timer.builder("producer.mongo.insert")
                 .tag("path", p.name())
-                .publishPercentileHistogram()
+                .tag("stage", String.valueOf(stage))
                 .register(registry);
     }
 

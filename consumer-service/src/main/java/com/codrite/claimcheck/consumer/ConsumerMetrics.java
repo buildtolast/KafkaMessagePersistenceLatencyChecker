@@ -23,10 +23,17 @@ public class ConsumerMetrics {
                 .register(registry);
     }
 
-    public Timer mongoFetch() {
+    public Timer mongoFetch(int stage) {
         return Timer.builder("consumer.mongo.fetch")
                 .tag("path", DeliveryPath.CLAIM_CHECK.name())
-                .publishPercentiles(0.5, 0.95, 0.99)
+                .tag("stage", String.valueOf(stage))
+                .register(registry);
+    }
+
+    public Timer mongoInsert(int stage) {
+        return Timer.builder("consumer.mongo.insert")
+                .tag("path", DeliveryPath.CLAIM_CHECK.name())
+                .tag("stage", String.valueOf(stage))
                 .register(registry);
     }
 

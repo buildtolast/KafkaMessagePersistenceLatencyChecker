@@ -13,6 +13,7 @@ public class StageProcessorTest {
     static class FakePayloadReader implements PayloadReader {
         private final Map<String, String> docs = new HashMap<>();
         private final List<String> fetchCalls = new ArrayList<>();
+        private final List<Integer> fetchStages = new ArrayList<>();
 
         void put(String id, String value) {
             docs.put(id, value);
@@ -22,9 +23,14 @@ public class StageProcessorTest {
             return fetchCalls;
         }
 
+        List<Integer> fetchStages() {
+            return fetchStages;
+        }
+
         @Override
-        public Optional<String> fetch(String mongoId) {
+        public Optional<String> fetch(String mongoId, int stage) {
             fetchCalls.add(mongoId);
+            fetchStages.add(stage);
             return Optional.ofNullable(docs.get(mongoId));
         }
     }
@@ -32,6 +38,7 @@ public class StageProcessorTest {
     static class FakePayloadStore implements PayloadStore {
         private final List<String> storedPayloads = new ArrayList<>();
         private final List<Long> storedSizes = new ArrayList<>();
+        private final List<Integer> storedStages = new ArrayList<>();
         private String nextId = "generated-id";
 
         void nextId(String id) {
@@ -46,14 +53,19 @@ public class StageProcessorTest {
             return storedSizes;
         }
 
+        List<Integer> storedStages() {
+            return storedStages;
+        }
+
         int callCount() {
             return storedPayloads.size();
         }
 
         @Override
-        public String store(String payload, long sizeBytes) {
+        public String store(String payload, long sizeBytes, int stage) {
             storedPayloads.add(payload);
             storedSizes.add(sizeBytes);
+            storedStages.add(stage);
             return nextId;
         }
     }
@@ -117,8 +129,10 @@ public class StageProcessorTest {
         assertThat(out.mongoId()).isEqualTo("new-id-001");
         assertThat(out.payload()).isNull();
         assertThat(reader.fetchCalls()).containsExactly(mongoId);
+        assertThat(reader.fetchStages()).containsExactly(1);
         assertThat(store.callCount()).isEqualTo(1);
         assertThat(store.storedPayloads().get(0)).hasSize(storedValue.length());
+        assertThat(store.storedStages()).containsExactly(1);
         assertThat(out.hopTrace()).hasSize(1);
         assertThat(out.hopTrace().get(0).stage()).isEqualTo(1);
     }

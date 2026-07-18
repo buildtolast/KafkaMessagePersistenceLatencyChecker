@@ -16,7 +16,6 @@ management:
   endpoints.web.exposure.include: health,prometheus,metrics
   metrics.distribution.percentiles-histogram:
     producer.kafka.send: true
-    producer.mongo.insert: true
 app:
   claim-check.threshold-bytes: 2097152
   chain.length: ${CHAIN_LENGTH:20}
