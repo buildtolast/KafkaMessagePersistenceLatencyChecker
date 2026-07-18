@@ -14,6 +14,10 @@ public final class MetricsAggregator {
     private Map<String, Double> previousCounters = new HashMap<>();
     private final Set<String> knownInstances = new TreeSet<>();
 
+    private record MetricKey(String name, String path) {}
+    private record RateInputs(Map<String, List<MetricSample>> snapshots, Map<String, Double> current) {}
+    private record PercentileKey(String baseName, String quantile, String path) {}
+
     public MetricsAggregator(double windowSeconds) {
         this.windowSeconds = windowSeconds;
     }
@@ -30,14 +34,15 @@ public final class MetricsAggregator {
             }
         }
 
+        RateInputs rateInputs = new RateInputs(snapshots, currentCounters);
         Map<String, ComparisonModel.PathStats> byPath = new LinkedHashMap<>();
         String[] paths = {"INLINE", "CLAIM_CHECK"};
         for (String p : paths) {
-            double msg = getRate(snapshots, currentCounters, "consumer_messages_total", p);
-            double mb = getRate(snapshots, currentCounters, "consumer_bytes_total", p) / 1_000_000.0;
-            double p50 = getWeightedAvg(snapshots, "chain_e2e_latency_seconds", "0.5", p);
-            double p95 = getWeightedAvg(snapshots, "chain_e2e_latency_seconds", "0.95", p);
-            double p99 = getWeightedAvg(snapshots, "chain_e2e_latency_seconds", "0.99", p);
+            double msg = getRate(rateInputs, new MetricKey("consumer_messages_total", p));
+            double mb = getRate(rateInputs, new MetricKey("consumer_bytes_total", p)) / 1_000_000.0;
+            double p50 = getWeightedAvg(snapshots, new PercentileKey("chain_e2e_latency_seconds", "0.5", p));
+            double p95 = getWeightedAvg(snapshots, new PercentileKey("chain_e2e_latency_seconds", "0.95", p));
+            double p99 = getWeightedAvg(snapshots, new PercentileKey("chain_e2e_latency_seconds", "0.99", p));
             double mIns = getAvgMs(snapshots, "producer_mongo_insert_seconds", p);
             double kSend = getAvgMs(snapshots, "producer_kafka_send_seconds", p);
             double mFetch = getAvgMs(snapshots, "consumer_mongo_fetch_seconds", p);
@@ -62,7 +67,7 @@ public final class MetricsAggregator {
             double instMsg = 0.0;
             if (up) {
                 for (String p : paths) {
-                    instMsg += getInstRate(inst, snapshots, currentCounters, "consumer_messages_total", p);
+                    instMsg += getInstRate(inst, rateInputs, new MetricKey("consumer_messages_total", p));
                 }
             }
             double lag = 0.0;
@@ -97,39 +102,38 @@ public final class MetricsAggregator {
         return sum;
     }
 
-    private double getRate(Map<String, List<MetricSample>> snapshots, Map<String, Double> current, String name, String path) {
+    private double getRate(RateInputs inputs, MetricKey key) {
         double totalDelta = 0;
-        for (Map.Entry<String, List<MetricSample>> entry : snapshots.entrySet()) {
-            String inst = entry.getKey();
-            String key = inst + "|" + name + "|" + path;
-            double curVal = current.getOrDefault(key, 0.0);
-            double prevVal = previousCounters.getOrDefault(key, curVal);
+        for (String inst : inputs.snapshots().keySet()) {
+            String cacheKey = inst + "|" + key.name() + "|" + key.path();
+            double curVal = inputs.current().getOrDefault(cacheKey, 0.0);
+            double prevVal = previousCounters.getOrDefault(cacheKey, curVal);
             totalDelta += (curVal - prevVal);
         }
         return totalDelta / windowSeconds;
     }
 
-    private double getInstRate(String inst, Map<String, List<MetricSample>> snapshots, Map<String, Double> current, String name, String path) {
-        String key = inst + "|" + name + "|" + path;
-        double curVal = current.getOrDefault(key, 0.0);
-        double prevVal = previousCounters.getOrDefault(key, curVal);
+    private double getInstRate(String inst, RateInputs inputs, MetricKey key) {
+        String cacheKey = inst + "|" + key.name() + "|" + key.path();
+        double curVal = inputs.current().getOrDefault(cacheKey, 0.0);
+        double prevVal = previousCounters.getOrDefault(cacheKey, curVal);
         return (curVal - prevVal) / windowSeconds;
     }
 
-    private double getWeightedAvg(Map<String, List<MetricSample>> snapshots, String baseName, String quantile, String path) {
+    private double getWeightedAvg(Map<String, List<MetricSample>> snapshots, PercentileKey key) {
         double weightedSum = 0;
         double totalWeight = 0;
         for (List<MetricSample> list : snapshots.values()) {
             double weight = 1.0;
             for (MetricSample sm : list) {
-                if (sm.name().equals(baseName + "_count") && pathOf(sm).equals(path)) {
+                if (sm.name().equals(key.baseName() + "_count") && pathOf(sm).equals(key.path())) {
                     weight = sm.value();
                     break;
                 }
             }
             if (weight <= 0) continue;
             for (MetricSample sm : list) {
-                if (sm.name().equals(baseName) && pathOf(sm).equals(path) && quantile.equals(sm.tags().get("quantile"))) {
+                if (sm.name().equals(key.baseName()) && pathOf(sm).equals(key.path()) && key.quantile().equals(sm.tags().get("quantile"))) {
                     weightedSum += (sm.value() * weight);
                     totalWeight += weight;
                     break;

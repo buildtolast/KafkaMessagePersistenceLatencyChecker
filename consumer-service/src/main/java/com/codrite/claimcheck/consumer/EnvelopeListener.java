@@ -70,7 +70,10 @@ public final class EnvelopeListener {
             metrics.recordStageHop(stageNumber, path, Duration.ofNanos(System.nanoTime() - hopStartNanos));
 
             log.info("Stage {}: Republished to {} [Path: {}]", stageNumber, r.targetTopic(), path);
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Interrupted while republishing message {}: {}", r.envelope().messageId(), e.getMessage());
+        } catch (ExecutionException e) {
             log.error("Failed to republish message {}: {}", r.envelope().messageId(), e.getMessage());
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize envelope for republish: {}", e.getMessage());
