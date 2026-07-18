@@ -48,12 +48,16 @@ services:
       kafka1: { condition: service_healthy }
       kafka2: { condition: service_healthy }
       kafka3: { condition: service_healthy }
+    environment:
+      CHAIN_LENGTH: "20"
     entrypoint: ["/bin/sh", "-c"]
     command: >
-      "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka1:9092 --create
-      --if-not-exists --topic messages --partitions 3 --replication-factor 3
+      "for i in $$(seq -w 1 $$CHAIN_LENGTH); do
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka1:9092 --create
+      --if-not-exists --topic topic-$$i --partitions 3 --replication-factor 3
       --config min.insync.replicas=2 --config max.message.bytes=3145728
-      --config retention.bytes=2147483648 --config retention.ms=1800000"
+      --config retention.bytes=2147483648 --config retention.ms=1800000;
+      done"
 
   mongo1:
     image: mongo:7
@@ -89,7 +93,7 @@ services:
       until mongosh --host mongo1 --quiet --eval 'db.hello().isWritablePrimary || quit(1)' >/dev/null 2>&1; do sleep 2; done;
       mongosh --host mongo1 --quiet --eval '
       db.getSiblingDB(\"claimcheck\").large_payloads.createIndex(
-        {createdAt: 1}, {expireAfterSeconds: 1800})'"
+        {createdAt: 1}, {expireAfterSeconds: 120})'"
 
   producer:
     build: ./producer-service
@@ -99,6 +103,8 @@ services:
     environment: &app-env
       KAFKA_BOOTSTRAP: kafka1:9092,kafka2:9092,kafka3:9092
       MONGO_URI: mongodb://mongo1:27017,mongo2:27017,mongo3:27017/claimcheck?replicaSet=rs0&w=majority
+      CHAIN_LENGTH: "20"
+      LOAD_TICK_MILLIS: "2000"
     healthcheck: &app-health
       test: ["CMD-SHELL", "wget -qO- http://localhost:8090/actuator/health | grep -q UP"]
       interval: 10s
