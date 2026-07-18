@@ -18,7 +18,7 @@ public final class MongoPayloadStore implements PayloadStore {
     }
 
     @Override
-    public String store(String payload, long sizeBytes) {
+    public String store(String payload, long sizeBytes, int stage) {
         Timer.Sample sample = Timer.start();
         try {
             Document doc = new Document("payload", payload)
@@ -27,7 +27,7 @@ public final class MongoPayloadStore implements PayloadStore {
             template.insert(doc, "large_payloads");
             return doc.getObjectId("_id").toHexString();
         } finally {
-            sample.stop(metrics.mongoInsert(DeliveryPath.CLAIM_CHECK));
+            sample.stop(metrics.mongoInsert(stage, DeliveryPath.CLAIM_CHECK));
         }
     }
 }

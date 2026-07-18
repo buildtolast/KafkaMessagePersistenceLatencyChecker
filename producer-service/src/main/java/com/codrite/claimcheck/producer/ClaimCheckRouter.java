@@ -24,7 +24,7 @@ public final class ClaimCheckRouter {
         long producedAtEpochNanos = createdAt.getEpochSecond() * 1_000_000_000L + createdAt.getNano();
 
         if (path == DeliveryPath.CLAIM_CHECK) {
-            String mongoId = store.store(payload, size);
+            String mongoId = store.store(payload, size, 0);
             return new MessageEnvelope(messageId, pairId, createdAt, producedAtEpochNanos, size, forcedPath, null, mongoId);
         } else {
             return new MessageEnvelope(messageId, pairId, createdAt, producedAtEpochNanos, size, forcedPath, payload, null);

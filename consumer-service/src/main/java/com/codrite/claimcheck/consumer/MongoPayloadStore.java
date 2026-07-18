@@ -4,24 +4,21 @@ import org.bson.Document;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Component;
 import io.micrometer.core.instrument.Timer;
-import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Date;
 
 @Component
 final class MongoPayloadStore implements PayloadStore {
     private final MongoTemplate template;
-    private final Timer insertTimer;
+    private final ConsumerMetrics metrics;
 
-    public MongoPayloadStore(MongoTemplate template, MeterRegistry meterRegistry) {
+    public MongoPayloadStore(MongoTemplate template, ConsumerMetrics metrics) {
         this.template = template;
-        this.insertTimer = Timer.builder("consumer.mongo.insert")
-                .tag("path", "CLAIM_CHECK")
-                .register(meterRegistry);
+        this.metrics = metrics;
     }
 
     @Override
-    public String store(String payload, long sizeBytes) {
+    public String store(String payload, long sizeBytes, int stage) {
         Timer.Sample sample = Timer.start();
         try {
             Document doc = new Document("payload", payload)
@@ -30,7 +27,7 @@ final class MongoPayloadStore implements PayloadStore {
             template.insert(doc, "large_payloads");
             return doc.getObjectId("_id").toHexString();
         } finally {
-            sample.stop(insertTimer);
+            sample.stop(metrics.mongoInsert(stage));
         }
     }
 }

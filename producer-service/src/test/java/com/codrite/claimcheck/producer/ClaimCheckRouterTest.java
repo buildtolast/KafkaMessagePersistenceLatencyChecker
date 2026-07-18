@@ -50,6 +50,7 @@ public class ClaimCheckRouterTest {
         assertThat(env.payload()).isNull();
         assertThat(store.lastPayload).isEqualTo("hi");
         assertThat(store.lastSize).isEqualTo(2);
+        assertThat(store.lastStage).isEqualTo(0);
     }
 
     @Test
@@ -69,12 +70,14 @@ public class ClaimCheckRouterTest {
     static class RecordingStore implements PayloadStore {
         String lastPayload;
         long lastSize;
+        int lastStage;
         int callCount = 0;
 
         @Override
-        public String store(String payload, long size) {
+        public String store(String payload, long size, int stage) {
             lastPayload = payload;
             lastSize = size;
+            lastStage = stage;
             callCount++;
             return "abc123";
         }

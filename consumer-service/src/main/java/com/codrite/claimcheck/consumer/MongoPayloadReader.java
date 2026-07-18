@@ -19,13 +19,13 @@ public final class MongoPayloadReader implements PayloadReader {
     }
 
     @Override
-    public Optional<String> fetch(String mongoId) {
+    public Optional<String> fetch(String mongoId, int stage) {
         Timer.Sample sample = Timer.start();
         try {
             Document doc = template.findById(new ObjectId(mongoId), Document.class, "large_payloads");
             return doc == null ? Optional.empty() : Optional.ofNullable(doc.getString("payload"));
         } finally {
-            sample.stop(metrics.mongoFetch());
+            sample.stop(metrics.mongoFetch(stage));
         }
     }
 }
