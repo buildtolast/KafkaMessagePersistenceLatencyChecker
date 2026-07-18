@@ -38,13 +38,24 @@
   .strip-label { font-size:0.8rem; color:#495057; }
   .chip { display:inline-flex; align-items:center; gap:6px; background:#f1f3f5; border-radius:999px; padding:4px 10px; font-size:0.8rem; }
   .chip.warn { background:#fff3bf; }
+  #lanes-panel { padding:16px; }
+  .lane-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .lane-label { width:80px; font-size:0.8rem; flex-shrink:0; }
+  .lane { flex:1; display:flex; gap:2px; }
+  .lane-stage { flex:1; height:22px; border-radius:3px; display:flex; align-items:center; justify-content:center; font-size:0.6rem; color:#fff; min-width:8px; }
+  #waterfall-panel { padding:16px; margin-top:12px; }
+  .wf-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .wf-label { width:80px; font-size:0.8rem; flex-shrink:0; }
+  .wf-track { flex:1; display:flex; gap:2px; height:20px; }
+  .wf-hop { flex:1; border-radius:3px; min-width:4px; }
+  .wf-empty { font-size:0.8rem; color:#868e96; }
 </style>
 </head>
 <body>
 <header class="card">
   <div>
     <h1>Claim check vs inline</h1>
-    <div class="sub">2 MB pairs · live comparison · window 5 min</div>
+    <div class="sub">2 MB pairs · 20-topic relay chain · live comparison · window 5 min</div>
   </div>
   <div>
     <span id="live-pill"><span id="live-dot"></span><span class="live-label">live</span></span>
@@ -85,6 +96,18 @@
       <div id="mongo-storage-card" class="card">stored in Mongo <strong id="mongo-storage">–</strong></div>
     </aside>
   </div>
+  <section id="lanes-panel" class="card">
+    <h3>Stage lanes</h3>
+    <div class="hint">avg hop latency per stage, ms</div>
+    <div class="lane-row"><span class="lane-label inline-color">inline</span><div class="lane" id="lanes-inline"></div></div>
+    <div class="lane-row"><span class="lane-label cc-color">claim check</span><div class="lane" id="lanes-cc"></div></div>
+  </section>
+  <section id="waterfall-panel" class="card">
+    <h3>Latest pair, hop by hop</h3>
+    <div class="hint">sampled trace of one message's journey through the chain</div>
+    <div class="wf-row"><span class="wf-label inline-color">inline</span><div class="wf-track" id="wf-inline"></div></div>
+    <div class="wf-row"><span class="wf-label cc-color">claim check</span><div class="wf-track" id="wf-cc"></div></div>
+  </section>
 </main>
 <footer class="card">
   <span class="strip-label">cluster</span>
