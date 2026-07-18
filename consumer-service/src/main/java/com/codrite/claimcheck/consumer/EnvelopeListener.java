@@ -4,56 +4,88 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 
 @Component
 public final class EnvelopeListener {
     private static final Logger log = LoggerFactory.getLogger(EnvelopeListener.class);
 
-    private final ClaimCheckResolver resolver;
+    private final StageProcessor stageProcessor;
     private final ConsumerMetrics metrics;
     private final ObjectMapper mapper;
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final int chainLength;
 
-    public EnvelopeListener(ClaimCheckResolver resolver, ConsumerMetrics metrics, ObjectMapper mapper) {
-        this.resolver = resolver;
+    public EnvelopeListener(
+            StageProcessor stageProcessor,
+            ConsumerMetrics metrics,
+            ObjectMapper mapper,
+            KafkaTemplate<String, String> kafkaTemplate,
+            @Value("${app.chain.length}") int chainLength) {
+        this.stageProcessor = stageProcessor;
         this.metrics = metrics;
         this.mapper = mapper;
+        this.kafkaTemplate = kafkaTemplate;
+        this.chainLength = chainLength;
     }
 
-    @KafkaListener(topics = "messages", groupId = "claim-check-demo")
-    public void onMessage(String value) {
-        MessageEnvelope env;
+    @KafkaListener(topicPattern = "topic-\\d{2}", groupId = "claim-check-demo")
+    public void onMessage(String value, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
         try {
-            env = mapper.readValue(value, MessageEnvelope.class);
+            MessageEnvelope envelope = mapper.readValue(value, MessageEnvelope.class);
+            int stageNumber = parseStageNumber(topic);
+            StageConfig config = new StageConfig(stageNumber, chainLength);
+            StageResult result = stageProcessor.process(envelope, config, Clock.systemUTC());
+
+            switch (result) {
+                case StageResult.Republish r -> handleRepublish(r, stageNumber);
+                case StageResult.Terminal t -> handleTerminal(t);
+                case StageResult.Skipped s -> log.error("Message skipped: {}", s.reason());
+            }
         } catch (JsonProcessingException e) {
-            log.error("failed to deserialize envelope", e);
-            return;
+            log.error("Failed to deserialize MessageEnvelope from topic {}: {}", topic, e.getMessage());
         }
+    }
 
-        long startNanos = System.nanoTime();
-        Optional<ResolvedMessage> resolved = resolver.resolve(env);
-
-        if (resolved.isEmpty()) {
-            log.error("missing claim-check document mongoId={} messageId={}", env.mongoId(), env.messageId());
-            return;
+    private void handleRepublish(StageResult.Republish r, int stageNumber) {
+        try {
+            String json = mapper.writeValueAsString(r.envelope());
+            kafkaTemplate.send(r.targetTopic(), r.envelope().messageId(), json).get();
+            
+            DeliveryPath path = pathOf(r.envelope());
+            metrics.recordMessage(path, r.envelope().payloadSizeBytes());
+            
+            log.info("Stage {}: Republished to {} [Path: {}]", stageNumber, r.targetTopic(), path);
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to republish message {}: {}", r.envelope().messageId(), e.getMessage());
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize envelope for republish: {}", e.getMessage());
         }
+    }
 
-        ResolvedMessage msg = resolved.get();
-        Duration processing = Duration.ofNanos(System.nanoTime() - startNanos);
-        Instant now = Instant.now();
-        long nowEpochNanos = now.getEpochSecond() * 1_000_000_000L + now.getNano();
-        Duration e2e = Duration.ofNanos(Math.max(0L, nowEpochNanos - env.producedAtEpochNanos()));
+    private void handleTerminal(StageResult.Terminal t) {
+        DeliveryPath path = pathOf(t.finalEnvelope());
+        metrics.recordE2e(path, Duration.ofNanos(t.chainTotalLatencyNanos()));
+        metrics.recordMessage(path, t.finalEnvelope().payloadSizeBytes());
+        
+        log.info("Terminal stage reached. MessageId: {}, Path: {}, Latency: {}ms", 
+                t.finalEnvelope().messageId(), path, t.chainTotalLatencyNanos() / 1_000_000.0);
+    }
 
-        metrics.recordProcessing(msg.path(), processing);
-        metrics.recordE2e(msg.path(), e2e);
-        metrics.recordMessage(msg.path(), msg.sizeBytes());
+    private static int parseStageNumber(String topic) {
+        return Integer.parseInt(topic.substring(topic.length() - 2));
+    }
 
-        log.info("consumed messageId={} path={} sizeBytes={} e2eMs={}",
-                msg.messageId(), msg.path(), msg.sizeBytes(), e2e.toMillis());
+    private static DeliveryPath pathOf(MessageEnvelope env) {
+        return env.mongoId() != null ? DeliveryPath.CLAIM_CHECK : DeliveryPath.INLINE;
     }
 }

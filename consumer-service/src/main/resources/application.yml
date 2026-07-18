@@ -9,6 +9,13 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
         max.partition.fetch.bytes: 3145728
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        max.request.size: 3145728
   data:
     mongodb:
       uri: ${MONGO_URI:mongodb://localhost:27017/claimcheck?w=majority}
