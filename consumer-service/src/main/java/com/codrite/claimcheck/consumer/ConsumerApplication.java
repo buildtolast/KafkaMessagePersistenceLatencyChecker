@@ -12,7 +12,7 @@ public class ConsumerApplication {
   }
 
   @Bean
-  public ClaimCheckResolver claimCheckResolver(PayloadReader reader) {
-    return new ClaimCheckResolver(reader);
+  public StageProcessor stageProcessor(PayloadReader reader, PayloadStore store) {
+    return new StageProcessor(reader, store);
   }
 }
