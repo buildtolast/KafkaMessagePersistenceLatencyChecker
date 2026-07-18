@@ -53,7 +53,7 @@ public class ProducerIntegrationTest {
         config.put("group.id", "it-test");
         config.put("auto.offset.reset", "earliest");
         KafkaConsumer<String, String> consumer = new KafkaConsumer<>(config, new StringDeserializer(), new StringDeserializer());
-        consumer.subscribe(List.of("messages"));
+        consumer.subscribe(List.of("topic-01"));
 
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());

@@ -29,7 +29,7 @@ public final class EnvelopePublisher {
             throw new IllegalStateException(e);
         }
         Timer.Sample sample = Timer.start();
-        kafka.send("messages", env.pairId(), json).join();
+        kafka.send("topic-01", env.pairId(), json).join();
         sample.stop(metrics.kafkaSend(path));
         metrics.recordMessage(path, env.payloadSizeBytes());
     }
