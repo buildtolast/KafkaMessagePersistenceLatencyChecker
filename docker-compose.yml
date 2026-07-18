@@ -133,3 +133,4 @@ services:
       producer: { condition: service_healthy }
     environment:
       DASHBOARD_TARGETS: http://producer:8090,http://consumer1:8091,http://consumer2:8091,http://consumer3:8091
+      DASHBOARD_CONSUMER_TARGETS: http://consumer1:8091,http://consumer2:8091,http://consumer3:8091

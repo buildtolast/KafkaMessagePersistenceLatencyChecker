@@ -5,3 +5,4 @@ management.endpoints.web.exposure.include: health
 app:
   dashboard:
     targets: ${DASHBOARD_TARGETS:http://localhost:8090,http://localhost:8091}
+    consumer-targets: ${DASHBOARD_CONSUMER_TARGETS:}
