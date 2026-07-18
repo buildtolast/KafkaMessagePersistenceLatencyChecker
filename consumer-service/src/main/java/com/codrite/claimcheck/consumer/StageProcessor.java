@@ -17,27 +17,17 @@ public final class StageProcessor {
     }
 
     public StageResult process(MessageEnvelope envelope, StageConfig config, Clock clock) {
-        Instant now = clock.instant();
-        long consumedAtEpochNanos = now.getEpochSecond() * 1_000_000_000L + now.getNano();
+        long consumedAtEpochNanos = epochNanos(clock);
 
         if (config.isTerminal()) {
             long chainTotalLatencyNanos = consumedAtEpochNanos - envelope.producedAtEpochNanos();
-            List<HopRecord> newTrace = new ArrayList<>(envelope.hopTrace());
-            newTrace.add(new HopRecord(config.stageNumber(), consumedAtEpochNanos, null));
-
-            MessageEnvelope terminalEnvelope = new MessageEnvelope(
-                envelope.messageId(),
-                envelope.pairId(),
-                envelope.createdAt(),
-                envelope.producedAtEpochNanos(),
-                envelope.payloadSizeBytes(),
-                envelope.forcedPath(),
-                envelope.payload(),
-                envelope.mongoId(),
-                newTrace
-            );
+            HopRecord hop = new HopRecord(config.stageNumber(), consumedAtEpochNanos, null);
+            MessageEnvelope terminalEnvelope = withHop(envelope, hop, envelope.payload(), envelope.mongoId());
             return new StageResult.Terminal(chainTotalLatencyNanos, terminalEnvelope);
         }
+
+        String targetTopic = config.nextTopic()
+            .orElseThrow(() -> new IllegalStateException("non-terminal stage " + config.stageNumber() + " has no next topic"));
 
         if (envelope.mongoId() != null) {
             Optional<String> fetched = reader.fetch(envelope.mongoId(), config.stageNumber());
@@ -47,47 +37,40 @@ public final class StageProcessor {
 
             String transformed = transform(fetched.get());
             String newMongoId = store.store(transformed, envelope.payloadSizeBytes(), config.stageNumber());
+            long publishedAtEpochNanos = epochNanos(clock);
 
-            Instant pubNow = clock.instant();
-            long publishedAtEpochNanos = pubNow.getEpochSecond() * 1_000_000_000L + pubNow.getNano();
-
-            List<HopRecord> newTrace = new ArrayList<>(envelope.hopTrace());
-            newTrace.add(new HopRecord(config.stageNumber(), consumedAtEpochNanos, publishedAtEpochNanos));
-
-            MessageEnvelope nextEnvelope = new MessageEnvelope(
-                envelope.messageId(),
-                envelope.pairId(),
-                envelope.createdAt(),
-                envelope.producedAtEpochNanos(),
-                envelope.payloadSizeBytes(),
-                envelope.forcedPath(),
-                null,
-                newMongoId,
-                newTrace
-            );
-            return new StageResult.Republish(nextEnvelope, config.nextTopic());
+            HopRecord hop = new HopRecord(config.stageNumber(), consumedAtEpochNanos, publishedAtEpochNanos);
+            MessageEnvelope nextEnvelope = withHop(envelope, hop, null, newMongoId);
+            return new StageResult.Republish(nextEnvelope, targetTopic);
         } else {
             String transformed = transform(envelope.payload());
+            long publishedAtEpochNanos = epochNanos(clock);
 
-            Instant pubNow = clock.instant();
-            long publishedAtEpochNanos = pubNow.getEpochSecond() * 1_000_000_000L + pubNow.getNano();
-
-            List<HopRecord> newTrace = new ArrayList<>(envelope.hopTrace());
-            newTrace.add(new HopRecord(config.stageNumber(), consumedAtEpochNanos, publishedAtEpochNanos));
-
-            MessageEnvelope nextEnvelope = new MessageEnvelope(
-                envelope.messageId(),
-                envelope.pairId(),
-                envelope.createdAt(),
-                envelope.producedAtEpochNanos(),
-                envelope.payloadSizeBytes(),
-                envelope.forcedPath(),
-                transformed,
-                null,
-                newTrace
-            );
-            return new StageResult.Republish(nextEnvelope, config.nextTopic());
+            HopRecord hop = new HopRecord(config.stageNumber(), consumedAtEpochNanos, publishedAtEpochNanos);
+            MessageEnvelope nextEnvelope = withHop(envelope, hop, transformed, null);
+            return new StageResult.Republish(nextEnvelope, targetTopic);
         }
+    }
+
+    private static long epochNanos(Clock clock) {
+        Instant instant = clock.instant();
+        return instant.getEpochSecond() * 1_000_000_000L + instant.getNano();
+    }
+
+    private static MessageEnvelope withHop(MessageEnvelope envelope, HopRecord hop, String payload, String mongoId) {
+        List<HopRecord> newTrace = new ArrayList<>(envelope.hopTrace());
+        newTrace.add(hop);
+        return new MessageEnvelope(
+            envelope.messageId(),
+            envelope.pairId(),
+            envelope.createdAt(),
+            envelope.producedAtEpochNanos(),
+            envelope.payloadSizeBytes(),
+            envelope.forcedPath(),
+            payload,
+            mongoId,
+            newTrace
+        );
     }
 
     private String transform(String payload) {
