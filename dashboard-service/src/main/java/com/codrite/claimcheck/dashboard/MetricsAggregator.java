@@ -35,14 +35,14 @@ public final class MetricsAggregator {
         for (String p : paths) {
             double msg = getRate(snapshots, currentCounters, "consumer_messages_total", p);
             double mb = getRate(snapshots, currentCounters, "consumer_bytes_total", p) / 1_000_000.0;
-            double p50 = getWeightedAvg(snapshots, "consumer_e2e_latency_seconds", "0.5", p);
-            double p95 = getWeightedAvg(snapshots, "consumer_e2e_latency_seconds", "0.95", p);
-            double p99 = getWeightedAvg(snapshots, "consumer_e2e_latency_seconds", "0.99", p);
+            double p50 = getWeightedAvg(snapshots, "chain_e2e_latency_seconds", "0.5", p);
+            double p95 = getWeightedAvg(snapshots, "chain_e2e_latency_seconds", "0.95", p);
+            double p99 = getWeightedAvg(snapshots, "chain_e2e_latency_seconds", "0.99", p);
             double mIns = getAvgMs(snapshots, "producer_mongo_insert_seconds", p);
             double kSend = getAvgMs(snapshots, "producer_kafka_send_seconds", p);
             double mFetch = getAvgMs(snapshots, "consumer_mongo_fetch_seconds", p);
-            double proc = getAvgMs(snapshots, "consumer_processing_seconds", p);
-            byPath.put(p, new ComparisonModel.PathStats(msg, mb, p50, p95, p99, mIns, kSend, mFetch, proc));
+            Map<Integer, Double> hopLatencyByStage = getHopLatencyByStage(snapshots, p);
+            byPath.put(p, new ComparisonModel.PathStats(msg, mb, p50, p95, p99, mIns, kSend, mFetch, hopLatencyByStage));
         }
 
         long mongoDocs = 0;
@@ -78,7 +78,7 @@ public final class MetricsAggregator {
         }
 
         previousCounters = currentCounters;
-        return new ComparisonModel(byPath, instances, mongoDocs, mongoBytes);
+        return new ComparisonModel(byPath, instances, mongoDocs, mongoBytes, new WaterfallModel(null, null));
     }
 
     private String pathOf(MetricSample sm) {
@@ -143,5 +143,34 @@ public final class MetricsAggregator {
         double sum = sumValues(snapshots, baseName + "_sum", path);
         double count = sumValues(snapshots, baseName + "_count", path);
         return count == 0 ? 0.0 : (sum / count) * 1000.0;
+    }
+
+    private Map<Integer, Double> getHopLatencyByStage(Map<String, List<MetricSample>> snapshots, String path) {
+        Map<Integer, Double> sums = new HashMap<>();
+        Map<Integer, Double> counts = new HashMap<>();
+        for (List<MetricSample> list : snapshots.values()) {
+            for (MetricSample sm : list) {
+                if (!pathOf(sm).equals(path)) continue;
+                String stageTag = sm.tags().get("stage");
+                if (stageTag == null) continue;
+                int stage;
+                try {
+                    stage = Integer.parseInt(stageTag);
+                } catch (NumberFormatException e) {
+                    continue;
+                }
+                if (sm.name().equals("stage_hop_latency_seconds_sum")) {
+                    sums.merge(stage, sm.value(), Double::sum);
+                } else if (sm.name().equals("stage_hop_latency_seconds_count")) {
+                    counts.merge(stage, sm.value(), Double::sum);
+                }
+            }
+        }
+        Map<Integer, Double> result = new java.util.TreeMap<>();
+        for (Map.Entry<Integer, Double> entry : sums.entrySet()) {
+            double count = counts.getOrDefault(entry.getKey(), 0.0);
+            result.put(entry.getKey(), count == 0 ? 0.0 : (entry.getValue() / count) * 1000.0);
+        }
+        return result;
     }
 }

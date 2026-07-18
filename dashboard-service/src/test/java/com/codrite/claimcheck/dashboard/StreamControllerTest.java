@@ -33,8 +33,8 @@ class StreamControllerTest {
     private static final MockWebServer server1 = new MockWebServer();
     private static final MockWebServer server2 = new MockWebServer();
     private static final String BODY = "consumer_messages_total{path=\"INLINE\"} 100.0\n" +
-            "consumer_e2e_latency_seconds{path=\"INLINE\",quantile=\"0.5\"} 0.010\n" +
-            "consumer_e2e_latency_seconds_count{path=\"INLINE\"} 10.0\n" +
+            "chain_e2e_latency_seconds{path=\"INLINE\",quantile=\"0.5\"} 0.010\n" +
+            "chain_e2e_latency_seconds_count{path=\"INLINE\"} 10.0\n" +
             "producer_messages_total{path=\"CLAIM_CHECK\"} 7.0\n" +
             "producer_bytes_total{path=\"CLAIM_CHECK\"} 14000000.0";
 

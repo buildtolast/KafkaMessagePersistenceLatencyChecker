@@ -7,12 +7,13 @@ public record ComparisonModel(
     Map<String, PathStats> byPath,
     List<InstanceHealth> instances,
     long mongoDocs,
-    double mongoBytes) {
+    double mongoBytes,
+    WaterfallModel waterfall) {
 
   public record PathStats(double msgPerSec, double mbPerSec,
       double e2eP50Ms, double e2eP95Ms, double e2eP99Ms,
       double mongoInsertAvgMs, double kafkaSendAvgMs,
-      double mongoFetchAvgMs, double processingAvgMs) {}
+      double mongoFetchAvgMs, Map<Integer, Double> hopLatencyAvgMsByStage) {}
 
   public record InstanceHealth(String name, boolean up, double msgPerSec, double lag) {}
 }

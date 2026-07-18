@@ -17,6 +17,10 @@ public class MetricsAggregatorTest {
         return new MetricSample(name, Map.of("path", path, "quantile", quantile), value);
     }
 
+    private static MetricSample stage(String name, String path, int stage, double value) {
+        return new MetricSample(name, Map.of("path", path, "stage", String.valueOf(stage)), value);
+    }
+
     @Test
     void ratesComeFromCounterDeltasAcrossCalls() {
         MetricsAggregator agg = new MetricsAggregator(2.0);
@@ -35,8 +39,8 @@ public class MetricsAggregatorTest {
     void quantilesWeightedByCountAcrossInstances() {
         MetricsAggregator agg = new MetricsAggregator(2.0);
         Map<String, List<MetricSample>> snap = new HashMap<>();
-        snap.put("consumer1", List.of(q("consumer_e2e_latency_seconds", "INLINE", "0.5", 0.010), s("consumer_e2e_latency_seconds_count", "INLINE", 10.0)));
-        snap.put("consumer2", List.of(q("consumer_e2e_latency_seconds", "INLINE", "0.5", 0.020), s("consumer_e2e_latency_seconds_count", "INLINE", 30.0)));
+        snap.put("consumer1", List.of(q("chain_e2e_latency_seconds", "INLINE", "0.5", 0.010), s("chain_e2e_latency_seconds_count", "INLINE", 10.0)));
+        snap.put("consumer2", List.of(q("chain_e2e_latency_seconds", "INLINE", "0.5", 0.020), s("chain_e2e_latency_seconds_count", "INLINE", 30.0)));
         ComparisonModel model = agg.aggregate(snap);
         assertEquals(17.5, model.byPath().get("INLINE").e2eP50Ms(), 1e-6);
     }
@@ -45,10 +49,30 @@ public class MetricsAggregatorTest {
     void timerAveragesFromSumOverCount() {
         MetricsAggregator agg = new MetricsAggregator(2.0);
         Map<String, List<MetricSample>> snap = new HashMap<>();
-        snap.put("producer", List.of(s("producer_mongo_insert_seconds_sum", "CLAIM_CHECK", 0.4), s("producer_mongo_insert_seconds_count", "CLAIM_CHECK", 10.0), s("consumer_processing_seconds_sum", "INLINE", 0.05), s("consumer_processing_seconds_count", "INLINE", 10.0)));
+        snap.put("producer", List.of(s("producer_mongo_insert_seconds_sum", "CLAIM_CHECK", 0.4), s("producer_mongo_insert_seconds_count", "CLAIM_CHECK", 10.0)));
         ComparisonModel model = agg.aggregate(snap);
         assertEquals(40.0, model.byPath().get("CLAIM_CHECK").mongoInsertAvgMs(), 1e-9);
-        assertEquals(5.0, model.byPath().get("INLINE").processingAvgMs(), 1e-9);
+    }
+
+    @Test
+    void hopLatencyAveragedPerStagePerPath() {
+        MetricsAggregator agg = new MetricsAggregator(2.0);
+        Map<String, List<MetricSample>> snap = new HashMap<>();
+        snap.put("consumer1", List.of(
+            stage("stage_hop_latency_seconds_sum", "INLINE", 1, 0.02),
+            stage("stage_hop_latency_seconds_count", "INLINE", 1, 10.0),
+            stage("stage_hop_latency_seconds_sum", "INLINE", 2, 0.06),
+            stage("stage_hop_latency_seconds_count", "INLINE", 2, 10.0)
+        ));
+        snap.put("consumer2", List.of(
+            stage("stage_hop_latency_seconds_sum", "INLINE", 1, 0.02),
+            stage("stage_hop_latency_seconds_count", "INLINE", 1, 10.0)
+        ));
+        ComparisonModel model = agg.aggregate(snap);
+        Map<Integer, Double> byStage = model.byPath().get("INLINE").hopLatencyAvgMsByStage();
+        // stage 1: (0.02+0.02)sum / (10+10)count * 1000 = 2.0ms; stage 2: 0.06/10*1000 = 6.0ms
+        assertEquals(2.0, byStage.get(1), 1e-9);
+        assertEquals(6.0, byStage.get(2), 1e-9);
     }
 
     @Test
