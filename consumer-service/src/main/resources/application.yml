@@ -24,6 +24,3 @@ app:
   chain.length: ${CHAIN_LENGTH:20}
 management:
   endpoints.web.exposure.include: health,prometheus,metrics
-  metrics.distribution.percentiles-histogram:
-    consumer.processing: true
-    consumer.mongo.fetch: true

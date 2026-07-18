@@ -17,14 +17,7 @@ public class ConsumerMetrics {
     }
 
     public Timer e2eLatency(DeliveryPath p) {
-        return Timer.builder("consumer.e2e.latency")
-                .tag("path", p.name())
-                .publishPercentiles(0.5, 0.95, 0.99)
-                .register(registry);
-    }
-
-    public Timer processing(DeliveryPath p) {
-        return Timer.builder("consumer.processing")
+        return Timer.builder("chain.e2e.latency")
                 .tag("path", p.name())
                 .publishPercentiles(0.5, 0.95, 0.99)
                 .register(registry);
@@ -37,12 +30,19 @@ public class ConsumerMetrics {
                 .register(registry);
     }
 
+    public Timer stageHopLatency(int stage, DeliveryPath p) {
+        return Timer.builder("stage.hop.latency")
+                .tag("stage", String.valueOf(stage))
+                .tag("path", p.name())
+                .register(registry);
+    }
+
     public void recordE2e(DeliveryPath p, Duration d) {
         e2eLatency(p).record(d);
     }
 
-    public void recordProcessing(DeliveryPath p, Duration d) {
-        processing(p).record(d);
+    public void recordStageHop(int stage, DeliveryPath p, Duration d) {
+        stageHopLatency(stage, p).record(d);
     }
 
     public void recordMessage(DeliveryPath p, long bytes) {

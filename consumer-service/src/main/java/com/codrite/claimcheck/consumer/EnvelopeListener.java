@@ -40,6 +40,7 @@ public final class EnvelopeListener {
 
     @KafkaListener(topicPattern = "topic-\\d{2}", groupId = "claim-check-demo")
     public void onMessage(String value, @Header(KafkaHeaders.RECEIVED_TOPIC) String topic) {
+        long hopStartNanos = System.nanoTime();
         try {
             MessageEnvelope envelope = mapper.readValue(value, MessageEnvelope.class);
             int stageNumber = parseStageNumber(topic);
@@ -47,8 +48,8 @@ public final class EnvelopeListener {
             StageResult result = stageProcessor.process(envelope, config, Clock.systemUTC());
 
             switch (result) {
-                case StageResult.Republish r -> handleRepublish(r, stageNumber);
-                case StageResult.Terminal t -> handleTerminal(t);
+                case StageResult.Republish r -> handleRepublish(r, stageNumber, hopStartNanos);
+                case StageResult.Terminal t -> handleTerminal(t, stageNumber, hopStartNanos);
                 case StageResult.Skipped s -> log.error("Message skipped: {}", s.reason());
             }
         } catch (JsonProcessingException e) {
@@ -56,14 +57,15 @@ public final class EnvelopeListener {
         }
     }
 
-    private void handleRepublish(StageResult.Republish r, int stageNumber) {
+    private void handleRepublish(StageResult.Republish r, int stageNumber, long hopStartNanos) {
         try {
             String json = mapper.writeValueAsString(r.envelope());
             kafkaTemplate.send(r.targetTopic(), r.envelope().messageId(), json).get();
-            
+
             DeliveryPath path = pathOf(r.envelope());
             metrics.recordMessage(path, r.envelope().payloadSizeBytes());
-            
+            metrics.recordStageHop(stageNumber, path, Duration.ofNanos(System.nanoTime() - hopStartNanos));
+
             log.info("Stage {}: Republished to {} [Path: {}]", stageNumber, r.targetTopic(), path);
         } catch (InterruptedException | ExecutionException e) {
             log.error("Failed to republish message {}: {}", r.envelope().messageId(), e.getMessage());
@@ -72,12 +74,13 @@ public final class EnvelopeListener {
         }
     }
 
-    private void handleTerminal(StageResult.Terminal t) {
+    private void handleTerminal(StageResult.Terminal t, int stageNumber, long hopStartNanos) {
         DeliveryPath path = pathOf(t.finalEnvelope());
         metrics.recordE2e(path, Duration.ofNanos(t.chainTotalLatencyNanos()));
         metrics.recordMessage(path, t.finalEnvelope().payloadSizeBytes());
-        
-        log.info("Terminal stage reached. MessageId: {}, Path: {}, Latency: {}ms", 
+        metrics.recordStageHop(stageNumber, path, Duration.ofNanos(System.nanoTime() - hopStartNanos));
+
+        log.info("Terminal stage reached. MessageId: {}, Path: {}, Latency: {}ms",
                 t.finalEnvelope().messageId(), path, t.chainTotalLatencyNanos() / 1_000_000.0);
     }
 

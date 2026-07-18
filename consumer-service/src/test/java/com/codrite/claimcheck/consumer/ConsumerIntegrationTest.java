@@ -92,10 +92,10 @@ class ConsumerIntegrationTest {
         double inlineTerminalLatencyCount = 0.0;
         double claimTerminalLatencyCount = 0.0;
         for (int i = 0; i < 60; i++) {
-            inlineTerminalLatencyCount = registry.find("consumer.e2e.latency").tag("path", "INLINE").timer() != null
-                ? registry.find("consumer.e2e.latency").tag("path", "INLINE").timer().count() : 0.0;
-            claimTerminalLatencyCount = registry.find("consumer.e2e.latency").tag("path", "CLAIM_CHECK").timer() != null
-                ? registry.find("consumer.e2e.latency").tag("path", "CLAIM_CHECK").timer().count() : 0.0;
+            inlineTerminalLatencyCount = registry.find("chain.e2e.latency").tag("path", "INLINE").timer() != null
+                ? registry.find("chain.e2e.latency").tag("path", "INLINE").timer().count() : 0.0;
+            claimTerminalLatencyCount = registry.find("chain.e2e.latency").tag("path", "CLAIM_CHECK").timer() != null
+                ? registry.find("chain.e2e.latency").tag("path", "CLAIM_CHECK").timer().count() : 0.0;
             if (inlineTerminalLatencyCount >= 1.0 && claimTerminalLatencyCount >= 1.0) {
                 break;
             }
