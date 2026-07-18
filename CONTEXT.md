@@ -92,3 +92,23 @@ container (Docker socket + repo mounted in), its own dashboard UI, its own port.
 Deliberately kept out of the existing passive, unprivileged `dashboard-service` to
 keep the container with host-level Docker access isolated and singular.
 _Avoid_: bolting onto dashboard-service, meta-dashboard
+
+**Cutover**:
+The moment a deployed candidate takes over from the currently running version of
+a service. Mechanism is per-service, not uniform: a real blue/green canary for
+consumer-service (joins the live Kafka consumer group before any real replica is
+touched), a near-zero-gap swap for dashboard-service, and an accepted brief-gap
+restart for producer-service (two live producers would double-publish and break
+twin-pair semantics, so true blue/green isn't meaningful there).
+_Avoid_: deploy (deploy is the whole build->verify->cutover sequence; cutover is
+just the traffic-shifting moment within it)
+
+**Automatic rollback**:
+Health-check-gated only: if a cutover's new container(s) never pass their
+healthcheck within a timeout, the agent reverts the merge, rebuilds, and
+redeploys the last-known-good image with no human involved. Deliberately does
+NOT trigger on a post-cutover metrics regression — judging "worse" vs. "noise"
+is left to a human via the dashboard's manual rollback action, to avoid the
+agent flapping a service on a false positive.
+_Avoid_: rollback (bare "rollback" is ambiguous between this automatic,
+crash-only trigger and the manual action below — always qualify which one)

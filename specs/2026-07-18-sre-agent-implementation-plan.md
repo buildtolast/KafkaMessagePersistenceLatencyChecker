@@ -142,13 +142,52 @@ Behavior:
   would block the checkout entirely. Only `mergeToMaster` touches the shared
   tree's `master` branch (a merge, not a checkout-and-edit), and the worktree
   is removed after merge or rejection.
-- `ContainerOps.buildAndRestart(String service) -> void` — shells out to
-  `docker compose -p kafkamessagepersistencetomongodb build <service>` then
-  `docker compose -p kafkamessagepersistencetomongodb up -d --no-deps
-  <service and replicas>` via the mounted socket (round-1 fix 4: the explicit
-  `-p` pin is mandatory, or this spins up a second parallel stack under
-  Compose's default directory-derived project name instead of touching the
-  real one). Refuses to target `sre-agent-service` itself.
+- `ContainerOps.deploy(String service) -> DeployResult` — shells out via the
+  mounted socket, always with `-p kafkamessagepersistencetomongodb` pinned
+  (round-1 fix 4). Refuses to target `sre-agent-service` itself. **Deployment
+  strategy is per-service, decided in user grilling (round 2), not uniform —
+  Compose has no native blue/green primitive, and the three services'
+  architectures don't support the same mechanism:**
+  - **`consumer-service` (3 replicas, Kafka consumer group) — real blue/green.**
+    Build the candidate image, start ONE extra temporary container joining
+    the *same* consumer group (4 members briefly) — Kafka's own rebalance
+    protocol hands it a slice of live partitions as a genuine canary,
+    without touching the 3 running replicas. Watch its health + metrics for
+    a confirmation window (reuses the 3-cycle-style confirmation pattern
+    from `AnalysisEngine`, applied here to deploy verification rather than
+    finding graduation). Healthy → roll-replace the 3 real replicas one at a
+    time (2-of-3 always serving), then remove the temp container. Unhealthy
+    → kill the temp container; blue was never touched — zero impact either
+    way.
+  - **`dashboard-service` (1 instance) — near-zero-impact cutover, not
+    provably zero.** Candidate starts on the internal network under its own
+    container name (not bound to host port 8085), health-checked
+    internally, then cuts over (stop old, start new bound to 8085). An
+    unavoidable few-hundred-ms gap exists while the port re-binds — a truly
+    gapless swap would need a reverse proxy in front, which doesn't exist in
+    this stack. Documented as a known, accepted limitation, not silently
+    glossed over.
+  - **`producer-service` (1 instance, scheduled publisher) — brief-gap
+    cutover, not blue/green.** Two live producers would both run the pair
+    generator and double-publish, corrupting the twin-pair semantics the
+    whole benchmark depends on. Candidate boots with `app.load.enabled=false`
+    (health-checked, but not publishing) for structural verification only;
+    cutover is a brief stop-old/start-new-with-load-enabled — a few seconds
+    of gap is unavoidable for a singleton scheduled task and is an explicit,
+    accepted trade-off rather than a solved case.
+  - **Automatic rollback (health-check-gated only — round 2 decision):**
+    after any cutover, `ContainerOps` waits for the new container(s)'
+    healthcheck within a timeout (e.g. 60s). If it never goes healthy, it
+    automatically `git revert`s the merge commit, rebuilds, and redeploys the
+    last-known-good image — no judgment call involved (did it come up or
+    not), so this is safe to fully automate. Deliberately does **NOT**
+    auto-rollback based on post-deploy metrics regressing (that requires
+    judging whether a regression is real vs. noise, which risks the agent
+    flapping a service back and forth on false positives) — that case is
+    handled by a **manual one-click Rollback button** on the dashboard
+    (Branch 8) next to each deployed fix, doing the same revert+rebuild+
+    redeploy on the human's say-so after they've watched the metrics
+    themselves.
 
 ## Wiring + persistence (Branch 7)
 
@@ -168,6 +207,11 @@ Behavior:
   cycle, confirmation count, explanation, diff once proposed), Approve/Reject
   buttons per finding, wired to new REST endpoints
   (`POST /api/findings/{id}/approve`, `POST /api/findings/{id}/reject`).
+- **Rollback (round 2 decision):** each successfully deployed fix keeps a
+  "Rollback" action available (last N deployments), calling
+  `POST /api/deployments/{id}/rollback` — same revert/rebuild/redeploy path
+  `ContainerOps` uses for its own automatic health-check-gated rollback, just
+  triggered by the human instead of a failed healthcheck.
 
 ## Testing
 
@@ -190,7 +234,9 @@ Behavior:
 3. MetricsSource + LogSource (Branch 3).
 4. LlmClient (Branch 4).
 5. CodeWorkflow (Branch 5).
-6. ContainerOps (Branch 6).
+6. ContainerOps (Branch 6) — per-service deploy strategy (real blue/green for
+   consumer-service, near-zero-gap for dashboard-service, brief-gap for
+   producer-service) plus health-check-gated automatic rollback.
 7. Scheduler wiring + persistence (Branch 7) — first point the whole loop
    runs end to end, even with a minimal/no UI.
 8. Dashboard UI (Branch 8).
