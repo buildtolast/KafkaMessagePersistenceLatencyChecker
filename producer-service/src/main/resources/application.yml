@@ -19,7 +19,8 @@ management:
     producer.mongo.insert: true
 app:
   claim-check.threshold-bytes: 2097152
+  chain.length: ${CHAIN_LENGTH:20}
   load:
     enabled: ${LOAD_ENABLED:true}
-    tick-millis: 200
+    tick-millis: ${LOAD_TICK_MILLIS:2000}
     payload-bytes: 2097152

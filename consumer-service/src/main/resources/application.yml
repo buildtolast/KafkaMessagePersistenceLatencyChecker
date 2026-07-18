@@ -13,6 +13,8 @@ spring:
     mongodb:
       uri: ${MONGO_URI:mongodb://localhost:27017/claimcheck?w=majority}
 server.port: 8091
+app:
+  chain.length: ${CHAIN_LENGTH:20}
 management:
   endpoints.web.exposure.include: health,prometheus,metrics
   metrics.distribution.percentiles-histogram:
